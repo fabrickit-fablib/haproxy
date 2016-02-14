@@ -1,7 +1,7 @@
-# haproxy
+# ha
 
 ## Overview
-This is haproxy of fablib.
+This is ha(pacemaker + corosync + haproxy) of fablib.
 
 ## Testing Guidelines
 ```
