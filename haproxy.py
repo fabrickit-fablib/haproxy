@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from fabkit import api, env, sudo, Service
+from fabkit import api, env, sudo, Service, filer
 from fablib.base import SimpleBase
 
 
@@ -21,8 +21,6 @@ class Haproxy(SimpleBase):
                 'pacemaker',
                 'pcs',
                 'corosync',
-                # 'fence-agents',
-                # 'resource-agents',
             ],
         }
 
@@ -64,10 +62,21 @@ class Haproxy(SimpleBase):
 
         if env.host == data['hosts'][0]:
             # stonith を無効化しておかないとresouceが作成できない
-            sudo("pcs property set stonith-enabled=false")
+            sudo('pcs property set stonith-enabled=false')
             sudo('pcs resource show vip || '
                  'pcs resource create vip ocf:heartbeat:IPaddr2 '
                  'ip="{0[vip]}" cidr_netmask="{0[cidr_netmask]}" '
                  'op monitor interval="{0[monitor_interval]}s"'.format(data))
+
+            sudo('pcs resource show lb-haproxy || '
+                 'pcs resource create lb-haproxy systemd:haproxy --clone')
+            sudo('pcs constraint order | grep "start vip then start lb-haproxy-clone" || '
+                 'pcs constraint order start vip then lb-haproxy-clone')
+            sudo('pcs constraint colocation | grep "vip with lb-haproxy-clone" || '
+                 'pcs constraint colocation add vip with lb-haproxy-clone')
+
+        is_change = filer.template('/etc/haproxy/haproxy.cfg', data=data)
+        if env.host == data['hosts'][0] and is_change:
+            Service('haproxy').reload()
 
         self.enable_services()
