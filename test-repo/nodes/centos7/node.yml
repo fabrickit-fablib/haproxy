@@ -37,28 +37,24 @@ haproxy:
         - timeout check           10s
         - maxconn                 3000
         - balance source
+      hastats:
+        enable: true
+        port: 49999
+        auth:
+          user: admin
+          pass: adminpass
       listens:
         - name: horizon
-          port: 443
-          option: tcpka
-          option: httpchk
-          option: tcplog
+          port: 40080
+          options:
+            - tcpka
+            - httpchk
+            - tcplog
           servers:
-           - controller1 10.0.0.1:443 check inter 2000 rise 2 fall 5
-           - controller2 10.0.0.2:443 check inter 2000 rise 2 fall 5
-           - controller3 10.0.0.3:443 check inter 2000 rise 2 fall 5
-        - name: glance-api
-          port: 9292
-          option: tcpka
-          option: httpchk
-          option: tcplog
-          servers:
-           - controller1 10.0.0.1:443 check inter 2000 rise 2 fall 5
-           - controller2 10.0.0.2:443 check inter 2000 rise 2 fall 5
-           - controller3 10.0.0.3:443 check inter 2000 rise 2 fall 5
+           - ctl1 192.168.122.50:80 check inter 2000 rise 2 fall 5
+           - ctl2 192.168.122.51:80 check inter 2000 rise 2 fall 5
         - name: mysql
-          port: 3306
+          port: 43306
           servers:
-            - controller1 10.0.0.1:3306 check port 9200 inter 2000 rise 2 fall 5
-            - controller2 10.0.0.2:3306 backup check port 9200 inter 2000 rise 2 fall 5
-            - controller3 10.0.0.3:3306 backup check port 9200 inter 2000 rise 2 fall 5
+           - ctl1 192.168.122.50:3306 check inter 2000 rise 2 fall 5
+           - ctl2 192.168.122.51:3306 check inter 2000 rise 2 fall 5
