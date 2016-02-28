@@ -47,9 +47,9 @@ haproxy:
         - name: horizon
           port: 40080
           options:
-            - tcpka
-            - httpchk
-            - tcplog
+            - option tcpka
+            - option httpchk
+            - option tcplog
           servers:
            - ctl1 192.168.122.50:80 check inter 2000 rise 2 fall 5
            - ctl2 192.168.122.51:80 check inter 2000 rise 2 fall 5
