@@ -31,11 +31,11 @@ class Haproxy(SimpleBase):
                 break
 
     def setup(self):
-        self.init()
+        data = self.init()
         sudo('setenforce 0')
         self.install_packages()
 
-        sudo("sh -c \"echo 'hacluster:hapass' |chpasswd\"")
+        sudo("sh -c \"echo 'hacluster:{0}' |chpasswd\"".format(data['ha_password']))
         Service('pcsd').start().enable()
 
     def setup_pcs(self):
@@ -44,10 +44,12 @@ class Haproxy(SimpleBase):
             with api.warn_only():
                 result = sudo("pcs cluster status")
                 if result.return_code != 0:
-                    sudo("pcs cluster auth 192.168.122.50 192.168.122.51 -u hacluster -p hapass")
+                    ha_hosts = ' '.join(data['hosts'])
+                    sudo("pcs cluster auth {0} -u hacluster -p {1}".format(
+                        ha_hosts, data['ha_password']))
 
                     # pcs cluster setup で/etc/corosync/corosync.conf が自動生成される
-                    sudo("pcs cluster setup --name hacluster 192.168.122.50 192.168.122.51")
+                    sudo("pcs cluster setup --name hacluster {0}".format(ha_hosts))
                     sudo("pcs cluster start --all")
                     sudo("corosync-cfgtool -s")
 
@@ -62,6 +64,8 @@ class Haproxy(SimpleBase):
 
         if env.host == data['hosts'][0]:
             # stonith を無効化しておかないとresouceが作成できない
+            sudo("pcs cluster start --all")
+
             sudo('pcs property set stonith-enabled=false')
             sudo('pcs resource show vip || '
                  'pcs resource create vip ocf:heartbeat:IPaddr2 '
