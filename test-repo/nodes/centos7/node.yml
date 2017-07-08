@@ -1,22 +1,20 @@
 node_map:
-  cluster1:
+  haproxy:
     hosts:
-      - 192.168.122.50
-      - 192.168.122.51
+      - 192.168.122.131
+      - 192.168.122.132
     fabruns:
-      - test/base
+      - haproxy/base
 
 haproxy:
+  ha_password: hapass
+  ctl_options:
+    - option tcpka
+    - option tcplog
   cluster_map:
-    cluster1:
-      hosts: ${#node_map.cluster1.hosts}
-      rings:
-        - bindnetaddr: 192.168.122.0
-          mcastport: 5405
-          nodes:
-            - 192.168.122.50
-            - 192.168.122.51
-      vip: 192.168.122.55
+    common:
+      hosts: ${#node_map.haproxy.hosts}
+      vip: 192.168.122.150
       cidr_netmask: 24
       monitor_interval: 30
       defaults:
@@ -39,22 +37,25 @@ haproxy:
         - balance source
       hastats:
         enable: true
-        port: 49999
+        port: 9999
         auth:
           user: admin
           pass: adminpass
       listens:
         - name: horizon
-          port: 40080
-          options:
-            - tcpka
-            - httpchk
-            - tcplog
-          servers:
-           - ctl1 192.168.122.50:80 check inter 2000 rise 2 fall 5
-           - ctl2 192.168.122.51:80 check inter 2000 rise 2 fall 5
+          port: 10080
+          options: ${#haproxy.ctl_options}
+          server_hosts: ${#node_map.haproxy.hosts}
+          server_port: 10080
+          server_option: check inter 2000 rise 2 fall 5
         - name: mysql
-          port: 43306
-          servers:
-           - ctl1 192.168.122.50:3306 check inter 2000 rise 2 fall 5
-           - ctl2 192.168.122.51:3306 check inter 2000 rise 2 fall 5
+          port: 13306
+          options:
+            - mode tcp
+            - maxconn 1024
+            - timeout connect 500000
+            - timeout client 1000000
+            - timeout server 1000000
+          server_hosts: ${#node_map.haproxy.hosts}
+          server_port: 13306
+          server_option: check inter 2000 rise 2 fall 5 backup

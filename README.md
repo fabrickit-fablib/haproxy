@@ -1,4 +1,4 @@
-# ha
+# haproxy
 
 ## Overview
 This is ha(pacemaker + corosync + haproxy) of fablib.

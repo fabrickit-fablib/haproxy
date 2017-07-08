@@ -30,6 +30,12 @@ class Haproxy(SimpleBase):
                 self.data.update(cluster)
                 break
 
+        for listen in self.data['listens']:
+            servers = []
+            for host in listen['server_hosts']:
+                servers.append("{0} {1[server_port]} {1[server_option]}".format(host, listen))
+            listen['servers'] = servers
+
     def setup(self):
         self.init()
         sudo('setenforce 0')
@@ -44,10 +50,11 @@ class Haproxy(SimpleBase):
             with api.warn_only():
                 result = sudo("pcs cluster status")
                 if result.return_code != 0:
-                    sudo("pcs cluster auth 192.168.122.50 192.168.122.51 -u hacluster -p hapass")
+                    hosts = " ".join(data['hosts'])
+                    sudo("pcs cluster auth {0} -u hacluster -p hapass".format(hosts))
 
                     # pcs cluster setup で/etc/corosync/corosync.conf が自動生成される
-                    sudo("pcs cluster setup --name hacluster 192.168.122.50 192.168.122.51")
+                    sudo("pcs cluster setup --name hacluster {0}".format(hosts))
                     sudo("pcs cluster start --all")
                     sudo("corosync-cfgtool -s")
 
