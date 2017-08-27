@@ -63,12 +63,12 @@ class Haproxy(SimpleBase):
             sudo('cp /etc/corosync/authkey /tmp/authkey')
             sudo('chmod 666 /tmp/authkey')
             api.get('/tmp/authkey', '/tmp/authkey')
+            sudo('rm /tmp/authkey')
 
         else:
             if not filer.exists('/etc/corosync/authkey'):
                 api.put('/tmp/authkey', '/tmp/authkey')
                 sudo('mv /tmp/authkey /etc/corosync/authkey')
-                sudo('rm /tmp/authkey')
                 sudo('chown root:root /etc/corosync/authkey')
                 sudo('chmod 400 /etc/corosync/authkey')
 
