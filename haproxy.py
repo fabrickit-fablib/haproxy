@@ -1,7 +1,11 @@
 # coding: utf-8
 
+import re
+import socket
 from fabkit import api, env, sudo, Service, filer
 from fablib.base import SimpleBase
+
+RE_CENTOS = re.compile('CentOS.*')
 
 
 class Haproxy(SimpleBase):
@@ -13,6 +17,9 @@ class Haproxy(SimpleBase):
             'CentOS Linux 7.*': [
                 'pcsd',
             ],
+            'Ubuntu 16.*': [
+                'pcsd',
+            ],
         }
 
         self.packages = {
@@ -21,6 +28,13 @@ class Haproxy(SimpleBase):
                 'pacemaker',
                 'pcs',
                 'corosync',
+            ],
+            'Ubuntu 16.*': [
+                'haproxy',
+                'pacemaker',
+                'pcs',
+                'corosync',
+                'haveged',
             ],
         }
 
@@ -32,7 +46,9 @@ class Haproxy(SimpleBase):
 
     def setup(self):
         data = self.init()
-        sudo('setenforce 0')
+        if RE_CENTOS.match(env.node['os']):
+            sudo('setenforce 0')
+
         self.install_packages()
 
         sudo("sh -c \"echo 'hacluster:{0}' |chpasswd\"".format(data['ha_password']))
@@ -41,39 +57,48 @@ class Haproxy(SimpleBase):
     def setup_pcs(self):
         data = self.init()
         if env.host == data['hosts'][0]:
-            with api.warn_only():
-                result = sudo("pcs cluster status")
-                if result.return_code != 0:
-                    ha_hosts = ' '.join(data['hosts'])
-                    sudo("pcs cluster auth {0} -u hacluster -p {1}".format(
-                        ha_hosts, data['ha_password']))
+            if not filer.exists('/etc/corosync/authkey'):
+                sudo('corosync-keygen')
 
-                    # pcs cluster setup で/etc/corosync/corosync.conf が自動生成される
-                    sudo("pcs cluster setup --name hacluster {0}".format(ha_hosts))
-                    sudo("pcs cluster start --all")
-                    sudo("corosync-cfgtool -s")
+            sudo('cp /etc/corosync/authkey /tmp/authkey')
+            sudo('chmod 666 /tmp/authkey')
+            api.get('/tmp/authkey', '/tmp/authkey')
 
-                    # 片系をpcs cluster stop でもう一方へfail over
-                    # cluster start で復帰
+        else:
+            if not filer.exists('/etc/corosync/authkey'):
+                api.put('/tmp/authkey', '/tmp/authkey')
+                sudo('mv /tmp/authkey /etc/corosync/authkey')
+                sudo('rm /tmp/authkey')
+                sudo('chown root:root /etc/corosync/authkey')
+                sudo('chmod 400 /etc/corosync/authkey')
 
-                    # rebootでもstopされfail over
-                    # reboot後にcluster start で復帰
+        data['bindnetaddr'] = env['node']['ip']['default_dev']['subnet'].split('/')[0]
+        nodes = []
+        for i, host in enumerate(env.hosts):
+            ip = socket.gethostbyname(host)
+            nodes.append({'id': i, 'ip': ip})
+        data['nodes'] = nodes
+        filer.template('/etc/corosync/corosync.conf', data=data)
+
+        with api.warn_only():
+            result = sudo("pcs cluster status")
+            if result.return_code != 0:
+                sudo("pcs cluster start")
 
     def setup_pacemaker(self):
         data = self.init()
 
         if env.host == data['hosts'][0]:
-            # stonith を無効化しておかないとresouceが作成できない
-            sudo("pcs cluster start --all")
+            # stonith を無効化しておかないとresouceが作成できない?
+            # sudo('pcs property set stonith-enabled=false')
 
-            sudo('pcs property set stonith-enabled=false')
             sudo('pcs resource show vip || '
                  'pcs resource create vip ocf:heartbeat:IPaddr2 '
                  'ip="{0[vip]}" cidr_netmask="{0[cidr_netmask]}" '
                  'op monitor interval="{0[monitor_interval]}s"'.format(data))
 
             sudo('pcs resource show lb-haproxy || '
-                 'pcs resource create lb-haproxy systemd:haproxy --clone')
+                 'pcs resource create lb-haproxy systemd:haproxy --clone --force')
             sudo('pcs constraint order | grep "start vip then start lb-haproxy-clone" || '
                  'pcs constraint order start vip then lb-haproxy-clone')
             sudo('pcs constraint colocation | grep "vip with lb-haproxy-clone" || '
