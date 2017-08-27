@@ -50,6 +50,8 @@ class Haproxy(SimpleBase):
             sudo('setenforce 0')
 
         self.install_packages()
+        sudo('systemctl stop haproxy')
+        sudo('systemctl disable haproxy')
 
         sudo("sh -c \"echo 'hacluster:{0}' |chpasswd\"".format(data['ha_password']))
         Service('pcsd').start().enable()
@@ -78,7 +80,9 @@ class Haproxy(SimpleBase):
             ip = socket.gethostbyname(host)
             nodes.append({'id': i, 'ip': ip})
         data['nodes'] = nodes
-        filer.template('/etc/corosync/corosync.conf', data=data)
+        if filer.template('/etc/corosync/corosync.conf', data=data):
+            sudo('systemctl restart pacemaker')
+            sudo('systemctl restart corosync')
 
         with api.warn_only():
             result = sudo("pcs cluster status")
