@@ -50,8 +50,7 @@ class Haproxy(SimpleBase):
             sudo('setenforce 0')
 
         self.install_packages()
-        sudo('systemctl stop haproxy')
-        sudo('systemctl disable haproxy')
+        Service('haproxy').disable()
 
         sudo("sh -c \"echo 'hacluster:{0}' |chpasswd\"".format(data['ha_password']))
         Service('pcsd').start().enable()
