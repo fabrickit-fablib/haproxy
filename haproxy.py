@@ -59,7 +59,7 @@ class Haproxy(SimpleBase):
         data = self.init()
         if env.host == data['hosts'][0]:
             if not filer.exists('/etc/corosync/authkey'):
-                sudo('corosync-keygen')
+                sudo('corosync-keygen -l')
 
             sudo('cp /etc/corosync/authkey /tmp/authkey')
             sudo('chmod 666 /tmp/authkey')
