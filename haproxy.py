@@ -93,8 +93,8 @@ class Haproxy(SimpleBase):
         data = self.init()
 
         if env.host == data['hosts'][0]:
-            # stonith を無効化しておかないとresouceが作成できない?
-            # sudo('pcs property set stonith-enabled=false')
+            # stonith を無効化しておかないとresouceがスタートしない
+            sudo('pcs property set stonith-enabled=false')
 
             sudo('pcs resource show vip || '
                  'pcs resource create vip ocf:heartbeat:IPaddr2 '
