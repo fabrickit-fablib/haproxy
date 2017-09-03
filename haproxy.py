@@ -28,6 +28,7 @@ class Haproxy(SimpleBase):
                 'pacemaker',
                 'pcs',
                 'corosync',
+                'haveged',
             ],
             'Ubuntu 16.*': [
                 'haproxy',
@@ -50,6 +51,7 @@ class Haproxy(SimpleBase):
             sudo('setenforce 0')
 
         self.install_packages()
+        filer.mkdir('/var/log/corosync')
         Service('haproxy').disable()
 
         sudo("sh -c \"echo 'hacluster:{0}' |chpasswd\"".format(data['ha_password']))
